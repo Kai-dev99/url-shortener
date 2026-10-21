@@ -89,3 +89,19 @@ func (s *Storage) GetURL(alias string) (string, error) {
 
 	return resURL, nil
 }
+
+func (s *Storage) DeleteURL(alias string) (int64, error) {
+	const fn = "storage.postgres.DeleteURL"
+
+	result, err := s.db.Exec("DELETE FROM url WHERE alias = $1", alias)
+	if err != nil {
+		return 0, fmt.Errorf("%s: execute statement: %w", fn, err)
+	}
+
+	rowsAffected, err := result.RowsAffected() // Считаем, сколько удалили
+	if err != nil {
+		return 0, fmt.Errorf("%s: get rows affected: %w", fn, err)
+	}
+
+	return rowsAffected, nil
+}
