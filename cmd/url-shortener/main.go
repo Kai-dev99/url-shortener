@@ -67,7 +67,31 @@ func main() {
 		}))
 
 		r.Post("/", save.New(log, storage))
-		// TODO: add DELETE /url/{id}
+
+		r.Post("/", save.New(log, storage))
+
+		r.Delete("/{alias}", func(w http.ResponseWriter, req *http.Request) {
+			alias := chi.URLParam(req, "alias")
+			if alias == "" {
+				http.Error(w, "invalid request", http.StatusBadRequest)
+				return
+			}
+
+			rows, err := storage.DeleteURL(alias)
+			if err != nil {
+				log.Error("failed to delete url", slog.String("alias", alias), sl.Err(err))
+				http.Error(w, "internal error", http.StatusInternalServerError)
+				return
+			}
+
+			if rows == 0 {
+				http.Error(w, "not found", http.StatusNotFound)
+				return
+			}
+
+			w.WriteHeader(http.StatusNoContent)
+		})
+
 	})
 
 	router.Get("/{alias}", redirect.New(log, storage))
