@@ -18,6 +18,7 @@ import (
 	"url-shortener/internal/config"
 	"url-shortener/internal/http-server/handlers/redirect"
 	"url-shortener/internal/http-server/handlers/url/save"
+	"url-shortener/internal/http-server/handlers/url/save/update"
 	mwLogger "url-shortener/internal/http-server/middleware/logger"
 	"url-shortener/internal/lib/logger/handlers/slogpretty"
 	"url-shortener/internal/lib/logger/sl"
@@ -67,29 +68,8 @@ func main() {
 		}))
 
 		r.Post("/", save.New(log, storage))
-
-		r.Post("/", save.New(log, storage))
-
+		r.Put("/", update.New(log, storage))
 		r.Delete("/{alias}", func(w http.ResponseWriter, req *http.Request) {
-			alias := chi.URLParam(req, "alias")
-			if alias == "" {
-				http.Error(w, "invalid request", http.StatusBadRequest)
-				return
-			}
-
-			rows, err := storage.DeleteURL(alias)
-			if err != nil {
-				log.Error("failed to delete url", slog.String("alias", alias), sl.Err(err))
-				http.Error(w, "internal error", http.StatusInternalServerError)
-				return
-			}
-
-			if rows == 0 {
-				http.Error(w, "not found", http.StatusNotFound)
-				return
-			}
-
-			w.WriteHeader(http.StatusNoContent)
 		})
 
 	})

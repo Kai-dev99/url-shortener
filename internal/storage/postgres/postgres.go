@@ -88,6 +88,19 @@ func (s *Storage) DeleteURL(alias string) (int64, error) {
 	return rowsAffected, nil
 }
 
+func (s *Storage) UpdateURL(alias string, newURL string) (int64, error) {
+	const fn = "storage.postgres.UpdateUrl"
+
+	result, err := s.db.Exec(context.Background(),
+		"UPDATE url SET url = $1 WHERE alias = $2", newURL, alias)
+
+	if err != nil {
+		return 0, fmt.Errorf("%s: execute statement %w", fn, err)
+	}
+	rowAffected := result.RowsAffected()
+	return rowAffected, nil
+}
+
 func (s *Storage) Close() error {
 	s.db.Close()
 	return nil
