@@ -6,34 +6,12 @@
 
 Нужен только Docker с Docker Compose.
 
-```sh
 git clone <repository-url>
 cd url-shortener
 cp .env.example .env
 docker compose up
-```
 
-После запуска сервис доступен по адресу `http://localhost:8082`. PostgreSQL доступен на `localhost:5432`.
-Контейнер приложения ожидает готовности PostgreSQL, а таблица и индекс создаются автоматически при старте.
 
-Значения подключения и Basic Auth задаются через `.env`; `config/local.yaml` не содержит секретов.
-После копирования `.env.example` используются следующие значения:
-
-| Параметр | Значение |
-| --- | --- |
-| HTTP-адрес | `localhost:8082` |
-| PostgreSQL | `localhost:5432` |
-| БД | `urlshortener` |
-| Пользователь БД | `postgres` |
-| Пароль БД | `chang_me` |
-| HTTP Basic Auth пользователь | `dev` |
-| HTTP Basic Auth пароль | `local_dev_only_change_me` |
-
-## HTTP API
-
-Операции изменения ссылок защищены Basic Auth из `.env`.
-
-```sh
 # Создать короткую ссылку; alias можно не передавать — он будет сгенерирован сервисом.
 curl -u dev:local_dev_only_change_me \
   -H "Content-Type: application/json" \
