@@ -1,19 +1,29 @@
-# URL shortener
+URL Shortener
 
-Сервис создаёт короткие ссылки, перенаправляет по алиасу и поддерживает изменение и удаление ссылок.
+Сервис для создания коротких ссылок, перенаправления пользователей по алиасу, а также изменения и удаления существующих ссылок.
 
-## Быстрый запуск
+Быстрый запуск
 
-# Нужен только Docker с Docker Compose.
- 
-# Порядок выполнения команд для запуска:
+Для запуска проекта необходимы Docker и Docker Compose.
 
-# git clone <repository-url>
-# cd url-shortener
-# cp .env.example .env
-# docker compose up
+# 1. Клонирование репозитория
 
+git clone <repository-url>
+cd url-shortener
 
+# 2. Настройка окружения
+
+Создайте файл .env на основе примера:
+
+cp .env.example .env
+
+# 3. Запуск приложения
+
+docker compose up
+
+После запуска сервис будет доступен по адресу:
+
+http://localhost:8082
 # Создать короткую ссылку; alias можно не передавать — он будет сгенерирован сервисом.
 curl -u dev:local_dev_only_change_me \
   -H "Content-Type: application/json" \
