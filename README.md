@@ -4,12 +4,14 @@
 
 ## Быстрый запуск
 
-Нужен только Docker с Docker Compose.
+# Нужен только Docker с Docker Compose.
+ 
+# Порядок выполнения команд для запуска:
 
-git clone <repository-url>
-cd url-shortener
-cp .env.example .env
-docker compose up
+# git clone <repository-url>
+# cd url-shortener
+# cp .env.example .env
+# docker compose up
 
 
 # Создать короткую ссылку; alias можно не передавать — он будет сгенерирован сервисом.
