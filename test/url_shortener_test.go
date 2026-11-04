@@ -3,10 +3,12 @@ package tests
 import (
 	"net/http"
 	"net/url"
+	"os"
 	"testing"
 
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/gavv/httpexpect/v2"
+	"github.com/joho/godotenv"
 	"github.com/stretchr/testify/require"
 
 	"url-shortener/internal/http-server/handlers/url/save"
@@ -18,7 +20,18 @@ const (
 	host = "localhost:8082"
 )
 
+func basicAuth(t *testing.T) (string, string) {
+	t.Helper()
+	require.NoError(t, godotenv.Load("../.env"), "copy .env.example to .env before running integration tests")
+	user := os.Getenv("HTTP_SERVER_USER")
+	password := os.Getenv("HTTP_SERVER_PASSWORD")
+	require.NotEmpty(t, user, "HTTP_SERVER_USER must be set in .env")
+	require.NotEmpty(t, password, "HTTP_SERVER_PASSWORD must be set in .env")
+	return user, password
+}
+
 func TestURLShortener_HappyPath(t *testing.T) {
+	user, password := basicAuth(t)
 	u := url.URL{
 		Scheme: "http",
 		Host:   host,
@@ -30,15 +43,16 @@ func TestURLShortener_HappyPath(t *testing.T) {
 			URL:   gofakeit.URL(),
 			Alias: random.NewRandomString(10),
 		}).
-		WithBasicAuth("myuser", "mypass").
+		WithBasicAuth(user, password).
 		Expect().
-		Status(200).
+		Status(http.StatusCreated).
 		JSON().Object().
 		ContainsKey("alias")
 }
 
 //nolint:funlen
 func TestURLShortener_SaveRedirect(t *testing.T) {
+	user, password := basicAuth(t)
 	testCases := []struct {
 		name  string
 		url   string
@@ -75,13 +89,18 @@ func TestURLShortener_SaveRedirect(t *testing.T) {
 
 			// Save
 
+			expectedStatus := http.StatusCreated
+			if tc.error != "" {
+				expectedStatus = http.StatusBadRequest
+			}
+
 			resp := e.POST("/url").
 				WithJSON(save.Request{
 					URL:   tc.url,
 					Alias: tc.alias,
 				}).
-				WithBasicAuth("myuser", "mypass").
-				Expect().Status(http.StatusOK).
+				WithBasicAuth(user, password).
+				Expect().Status(expectedStatus).
 				JSON().Object()
 
 			if tc.error != "" {

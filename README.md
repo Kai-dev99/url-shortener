@@ -1,51 +1,54 @@
-# URL Shortener
+# URL shortener
 
-Сервис сокращения ссылок на Go + Postgres.
+Сервис создаёт короткие ссылки, перенаправляет по алиасу и поддерживает изменение и удаление ссылок.
 
-## Быстрый старт
+## Быстрый запуск
 
-```bash
-git clone <repo-url> url-shortener
+Нужен только Docker с Docker Compose.
+
+```sh
+git clone <repository-url>
 cd url-shortener
 cp .env.example .env
 docker compose up
 ```
 
-После старта сервис доступен на [http://localhost:8082](http://localhost:8082).
+После запуска сервис доступен по адресу `http://localhost:8082`. PostgreSQL доступен на `localhost:5432`.
+Контейнер приложения ожидает готовности PostgreSQL, а таблица и индекс создаются автоматически при старте.
 
-## Порты и креды
+Значения подключения и Basic Auth задаются через `.env`; `config/local.yaml` не содержит секретов.
+После копирования `.env.example` используются следующие значения:
 
-| Что | Значение |
+| Параметр | Значение |
 | --- | --- |
-| HTTP | `localhost:8082` |
-| Basic Auth | `myuser` / `mypass` |
-| Postgres | `localhost:5432` |
-| Postgres user / password / db | `postgres` / `mypass` / `urlshortener` |
-| `DATABASE_URL` | `postgres://postgres:mypass@localhost:5432/urlshortener` |
+| HTTP-адрес | `localhost:8082` |
+| PostgreSQL | `localhost:5432` |
+| БД | `urlshortener` |
+| Пользователь БД | `postgres` |
+| Пароль БД | `chang_me` |
+| HTTP Basic Auth пользователь | `dev` |
+| HTTP Basic Auth пароль | `local_dev_only_change_me` |
 
-Эти значения совпадают в `.env.example`, `docker-compose.yml`, `config/local.yaml` и `config/docker.yaml`.
+## HTTP API
 
-## Примеры запросов
+Операции изменения ссылок защищены Basic Auth из `.env`.
 
-Создать короткую ссылку:
-
-```bash
-curl -u myuser:mypass -X POST http://localhost:8082/url \
+```sh
+# Создать короткую ссылку; alias можно не передавать — он будет сгенерирован сервисом.
+curl -u dev:local_dev_only_change_me \
   -H "Content-Type: application/json" \
-  -d "{\"url\":\"https://example.com\",\"alias\":\"demo\"}"
+  -d '{"url":"https://example.com","alias":"example"}' \
+  http://localhost:8082/url/
+
+# Перенаправить по короткой ссылке.
+curl -i http://localhost:8082/example
+
+# Изменить и удалить ссылку.
+curl -X PUT -u dev:local_dev_only_change_me \
+  -H "Content-Type: application/json" \
+  -d '{"alias":"example","url":"https://example.org"}' \
+  http://localhost:8082/url/
+curl -X DELETE -u dev:local_dev_only_change_me http://localhost:8082/url/example
 ```
 
-Перейти по короткой ссылке:
-
-```bash
-curl -i http://localhost:8082/demo
-```
-
-## Локальный запуск без Docker (опционально)
-
-Нужны Go и уже поднятый Postgres с теми же кредами, что выше.
-
-```bash
-cp .env.example .env
-go run ./cmd/url-shortener
-```
+Для остановки контейнеров используйте `docker compose down`. Добавьте `-v`, только если также нужно удалить данные PostgreSQL.

@@ -34,7 +34,7 @@ func TestSaveHandler(t *testing.T) {
 			urlGetterMock := mocks.NewURLGetter(t)
 
 			if tc.respError == "" || tc.mockError != nil {
-				urlGetterMock.On("GetURL", tc.alias).
+				urlGetterMock.On("Get", tc.alias).
 					Return(tc.url, tc.mockError).Once()
 			}
 

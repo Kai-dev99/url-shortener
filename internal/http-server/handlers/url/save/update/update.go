@@ -41,6 +41,7 @@ func New(log *slog.Logger, updater URLUpdater) http.HandlerFunc {
 		err := render.DecodeJSON(r.Body, &req)
 		if err != nil {
 			log.Error("failed to decode request body", sl.Err(err))
+			render.Status(r, http.StatusBadRequest)
 			render.JSON(w, r, resp.Error("failed to decode request body"))
 			return
 		}
@@ -51,16 +52,19 @@ func New(log *slog.Logger, updater URLUpdater) http.HandlerFunc {
 		var validateErr validator.ValidationErrors
 		if errors.As(err, &validateErr) {
 			log.Error("invalid request", sl.Err(err))
+			render.Status(r, http.StatusBadRequest)
 			render.JSON(w, r, resp.ValidationError(validateErr))
 			return
 		}
 		if errors.Is(err, storage.ErrURLNotFound) {
 			log.Info("url not found", "alias", req.Alias)
+			render.Status(r, http.StatusNotFound)
 			render.JSON(w, r, resp.Error("url not found"))
 			return
 		}
 		if err != nil {
 			log.Error("failed to update url", "alias", req.Alias, sl.Err(err))
+			render.Status(r, http.StatusInternalServerError)
 			render.JSON(w, r, resp.Error("failed to update url"))
 			return
 		}

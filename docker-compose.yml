@@ -29,6 +29,7 @@ services:
       CONFIG_PATH: /app/config/docker.yaml
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
       HTTP_SERVER_PASSWORD: ${HTTP_SERVER_PASSWORD}
+      HTTP_SERVER_USER: ${HTTP_SERVER_USER}
     restart: unless-stopped
 
 volumes:
