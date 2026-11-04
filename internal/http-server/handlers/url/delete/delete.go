@@ -1,6 +1,7 @@
 package delete
 
 import (
+	"errors"
 	"log/slog"
 	"net/http"
 
@@ -10,6 +11,7 @@ import (
 
 	resp "url-shortener/internal/lib/api/response"
 	"url-shortener/internal/lib/logger/sl"
+	"url-shortener/internal/storage"
 )
 
 type Response struct {
@@ -17,11 +19,11 @@ type Response struct {
 	CountDeleted int64 `json:"countDeleted"`
 }
 
-type DeleteURL interface {
-	DeleteURL(alias string) (int64, error)
+type URLDeleter interface {
+	Delete(alias string) (int64, error)
 }
 
-func New(log *slog.Logger, deleteURL DeleteURL) http.HandlerFunc {
+func New(log *slog.Logger, deleter URLDeleter) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		const op = "handlers.url.delete.New"
 
@@ -38,17 +40,16 @@ func New(log *slog.Logger, deleteURL DeleteURL) http.HandlerFunc {
 			return
 		}
 
-		count, err := deleteURL.DeleteURL(alias)
+		count, err := deleter.Delete(alias)
+		if errors.Is(err, storage.ErrURLNotFound) {
+			render.Status(r, http.StatusNotFound)
+			render.JSON(w, r, resp.Error("not found"))
+			return
+		}
 		if err != nil {
 			log.Error("failed to delete url", sl.Err(err))
 			render.Status(r, http.StatusInternalServerError)
 			render.JSON(w, r, resp.Error("internal error"))
-			return
-		}
-
-		if count == 0 {
-			render.Status(r, http.StatusNotFound)
-			render.JSON(w, r, resp.Error("not found"))
 			return
 		}
 

@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"log"
 	"log/slog"
 	"net/http"
 	"os"
@@ -17,11 +16,13 @@ import (
 
 	"url-shortener/internal/config"
 	"url-shortener/internal/http-server/handlers/redirect"
+	"url-shortener/internal/http-server/handlers/url/delete"
 	"url-shortener/internal/http-server/handlers/url/save"
 	"url-shortener/internal/http-server/handlers/url/save/update"
 	mwLogger "url-shortener/internal/http-server/middleware/logger"
 	"url-shortener/internal/lib/logger/handlers/slogpretty"
 	"url-shortener/internal/lib/logger/sl"
+	"url-shortener/internal/service"
 	"url-shortener/internal/storage/postgres"
 )
 
@@ -33,10 +34,8 @@ const (
 
 func main() {
 
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file")
-	}
+	// Optional: env vars can come from Docker Compose / the process environment.
+	_ = godotenv.Load()
 
 	cfg := config.MustLoad()
 
@@ -55,6 +54,8 @@ func main() {
 		os.Exit(1)
 	}
 
+	urlService := service.New(storage)
+
 	router := chi.NewRouter()
 
 	router.Use(middleware.RequestID)
@@ -67,14 +68,12 @@ func main() {
 			cfg.HTTPServer.User: cfg.HTTPServer.Password,
 		}))
 
-		r.Post("/", save.New(log, storage))
-		r.Put("/", update.New(log, storage))
-		r.Delete("/{alias}", func(w http.ResponseWriter, req *http.Request) {
-		})
-
+		r.Post("/", save.New(log, urlService))
+		r.Put("/", update.New(log, urlService))
+		r.Delete("/{alias}", delete.New(log, urlService))
 	})
 
-	router.Get("/{alias}", redirect.New(log, storage))
+	router.Get("/{alias}", redirect.New(log, urlService))
 
 	log.Info("starting server", slog.String("address", cfg.Address))
 

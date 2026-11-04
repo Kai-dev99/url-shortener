@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"url-shortener/internal/storage"
 
-	"github.com/jackc/pgx"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"url-shortener/internal/storage"
 )
 
 type Storage struct {
@@ -38,67 +40,64 @@ func New(storagePath string) (*Storage, error) {
 }
 
 func (s *Storage) SaveURL(urlToSave string, alias string) (int64, error) {
-	const tn = "storage.postgres.SaveURL"
+	const op = "storage.postgres.SaveURL"
 
 	var id int64
 	err := s.db.QueryRow(
 		context.Background(),
-		`INSERT INTO url(alias, url) VALUES($1, $2)
-		ON CONFLICT (alias) DO UPDATE SET url = EXCLUDED.url
-		RETURNING id`,
+		`INSERT INTO url(alias, url) VALUES($1, $2) RETURNING id`,
 		alias,
 		urlToSave,
 	).Scan(&id)
-
 	if err != nil {
-		return 0, fmt.Errorf("%s: %w", tn, err)
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			return 0, fmt.Errorf("%s: %w", op, storage.ErrURLExists)
+		}
+		return 0, fmt.Errorf("%s: %w", op, err)
 	}
 
 	return id, nil
 }
 
 func (s *Storage) GetURL(alias string) (string, error) {
-	const op = "storage.atorage.GetURL"
+	const op = "storage.postgres.GetURL"
 
 	var url string
 	err := s.db.QueryRow(context.Background(),
 		"SELECT url FROM url WHERE alias = $1", alias).Scan(&url)
-
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return "", storage.ErrURLNotFound
 		}
-		return "", fmt.Errorf("%s: execute statement %w", op, err)
+		return "", fmt.Errorf("%s: execute statement: %w", op, err)
 	}
-	return url, nil
 
+	return url, nil
 }
 
 func (s *Storage) DeleteURL(alias string) (int64, error) {
-	const fn = "storage.postgres.DeleteURL"
+	const op = "storage.postgres.DeleteURL"
 
 	result, err := s.db.Exec(context.Background(),
 		"DELETE FROM url WHERE alias = $1", alias)
 	if err != nil {
-		return 0, fmt.Errorf("%s: execute statement: %w", fn, err)
+		return 0, fmt.Errorf("%s: execute statement: %w", op, err)
 	}
 
-	rowsAffected := result.RowsAffected() // Считаем, сколько удалили
-
-	return rowsAffected, nil
+	return result.RowsAffected(), nil
 }
 
 func (s *Storage) UpdateURL(alias string, newURL string) (int64, error) {
-	const fn = "storage.postgres.UpdateUrl"
+	const op = "storage.postgres.UpdateURL"
 
 	result, err := s.db.Exec(context.Background(),
 		"UPDATE url SET url = $1 WHERE alias = $2", newURL, alias)
-
 	if err != nil {
-		return 0, fmt.Errorf("%s: execute statement %w", fn, err)
+		return 0, fmt.Errorf("%s: execute statement: %w", op, err)
 	}
-	rowAffected := result.RowsAffected()
-	return rowAffected, nil
+
+	return result.RowsAffected(), nil
 }
 
 func (s *Storage) Close() error {

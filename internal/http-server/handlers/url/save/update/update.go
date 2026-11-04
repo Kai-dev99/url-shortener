@@ -5,18 +5,18 @@ import (
 	"log/slog"
 	"net/http"
 
-	resp "url-shortener/internal/lib/api/response"
-	"url-shortener/internal/lib/logger/sl"
-	"url-shortener/internal/storage"
-
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/render"
 	"github.com/go-playground/validator/v10"
+
+	resp "url-shortener/internal/lib/api/response"
+	"url-shortener/internal/lib/logger/sl"
+	"url-shortener/internal/storage"
 )
 
 type Request struct {
-	Alias  string `json:"alias" validate:"required"`
-	NewURL string `json:"url" validate:"required,url"`
+	Alias  string `json:"alias"`
+	NewURL string `json:"url"`
 }
 
 type Response struct {
@@ -24,11 +24,11 @@ type Response struct {
 	CountUpdated int64 `json:"countUpdated"`
 }
 
-type UpdateURL interface {
-	UpdateURL(alias string, newURL string) (int64, error)
+type URLUpdater interface {
+	Update(alias string, newURL string) (int64, error)
 }
 
-func New(log *slog.Logger, updateURL UpdateURL) http.HandlerFunc {
+func New(log *slog.Logger, updater URLUpdater) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		const op = "handlers.url.update.New"
 
@@ -36,6 +36,7 @@ func New(log *slog.Logger, updateURL UpdateURL) http.HandlerFunc {
 			slog.String("op", op),
 			slog.String("request_id", middleware.GetReqID(r.Context())),
 		)
+
 		var req Request
 		err := render.DecodeJSON(r.Body, &req)
 		if err != nil {
@@ -43,36 +44,31 @@ func New(log *slog.Logger, updateURL UpdateURL) http.HandlerFunc {
 			render.JSON(w, r, resp.Error("failed to decode request body"))
 			return
 		}
+
 		log.Info("request body decoded", slog.Any("request", req))
 
-		if err := validator.New().Struct(req); err != nil {
-			validateErr := err.(validator.ValidationErrors)
+		countUpdated, err := updater.Update(req.Alias, req.NewURL)
+		var validateErr validator.ValidationErrors
+		if errors.As(err, &validateErr) {
 			log.Error("invalid request", sl.Err(err))
 			render.JSON(w, r, resp.ValidationError(validateErr))
 			return
 		}
-		alias := req.Alias
-		newURL := req.NewURL
-
-		countUpdated, err := updateURL.UpdateURL(alias, newURL)
 		if errors.Is(err, storage.ErrURLNotFound) {
-			log.Info("url not found", "alias", alias)
+			log.Info("url not found", "alias", req.Alias)
 			render.JSON(w, r, resp.Error("url not found"))
 			return
 		}
 		if err != nil {
-			log.Error("failed to update url", "alias", alias, sl.Err(err))
+			log.Error("failed to update url", "alias", req.Alias, sl.Err(err))
 			render.JSON(w, r, resp.Error("failed to update url"))
 			return
 		}
-		log.Info("url updated", slog.String("alias", alias), slog.Int64("count_deleted", countUpdated))
-		responseOK(w, r, countUpdated)
-	}
-}
 
-func responseOK(w http.ResponseWriter, r *http.Request, countUpdated int64) {
-	render.JSON(w, r, Response{
-		Response:     resp.OK(),
-		CountUpdated: countUpdated,
-	})
+		log.Info("url updated", slog.String("alias", req.Alias), slog.Int64("count_updated", countUpdated))
+		render.JSON(w, r, Response{
+			Response:     resp.OK(),
+			CountUpdated: countUpdated,
+		})
+	}
 }

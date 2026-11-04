@@ -11,12 +11,11 @@ import (
 
 	resp "url-shortener/internal/lib/api/response"
 	"url-shortener/internal/lib/logger/sl"
-	"url-shortener/internal/lib/random"
 	"url-shortener/internal/storage"
 )
 
 type Request struct {
-	URL   string `json:"url" validate:"required,url"`
+	URL   string `json:"url"`
 	Alias string `json:"alias,omitempty"`
 }
 
@@ -25,14 +24,11 @@ type Response struct {
 	Alias string `json:"alias,omitempty"`
 }
 
-// TODO: move to config
-const aliasLength = 6
-
-// URLSaver is an interface for saving url with alias.
+// URLSaver saves a URL via the service layer.
 //
 //go:generate go run github.com/vektra/mockery/v2@v2.28.2 --name=URLSaver
 type URLSaver interface {
-	SaveURL(urlToSave string, alias string) (int64, error)
+	Save(urlToSave string, alias string) (string, error)
 }
 
 func New(log *slog.Logger, urlSaver URLSaver) http.HandlerFunc {
@@ -49,44 +45,31 @@ func New(log *slog.Logger, urlSaver URLSaver) http.HandlerFunc {
 		err := render.DecodeJSON(r.Body, &req)
 		if err != nil {
 			log.Error("failed to decode request body", sl.Err(err))
-
 			render.JSON(w, r, resp.Error("failed to decode request"))
-
 			return
 		}
 
 		log.Info("request body decoded", slog.Any("request", req))
 
-		if err := validator.New().Struct(req); err != nil {
+		alias, err := urlSaver.Save(req.URL, req.Alias)
+		var validateErr validator.ValidationErrors
+		if errors.As(err, &validateErr) {
 			log.Error("invalid request", sl.Err(err))
-
-			render.JSON(w, r, resp.ValidationError(err))
-
+			render.JSON(w, r, resp.ValidationError(validateErr))
 			return
 		}
-
-		alias := req.Alias
-		if alias == "" {
-			alias = random.NewRandomString(aliasLength)
-		}
-
-		id, err := urlSaver.SaveURL(req.URL, alias)
 		if errors.Is(err, storage.ErrURLExists) {
 			log.Info("url already exists", slog.String("url", req.URL))
-
 			render.JSON(w, r, resp.Error("url already exists"))
-
 			return
 		}
 		if err != nil {
 			log.Error("failed to add url", sl.Err(err))
-
 			render.JSON(w, r, resp.Error("failed to add url"))
-
 			return
 		}
 
-		log.Info("url added", slog.Int64("id", id))
+		log.Info("url added", slog.String("alias", alias))
 
 		render.JSON(w, r, Response{
 			Response: resp.OK(),

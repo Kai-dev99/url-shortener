@@ -34,7 +34,7 @@ func TestRedirectHandler(t *testing.T) {
 			urlGetterMock := mocks.NewURLGetter(t)
 
 			if tc.respError == "" || tc.mockError != nil {
-				urlGetterMock.On("GetURL", tc.alias).
+				urlGetterMock.On("Get", tc.alias).
 					Return(tc.url, tc.mockError).Once()
 			}
 
@@ -47,7 +47,6 @@ func TestRedirectHandler(t *testing.T) {
 			redirectedToURL, err := api.GetRedirect(ts.URL + "/" + tc.alias)
 			require.NoError(t, err)
 
-			// Check the final URL after redirection.
 			assert.Equal(t, tc.url, redirectedToURL)
 		})
 	}
