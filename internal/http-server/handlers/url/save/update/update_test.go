@@ -3,6 +3,7 @@ package update_test
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -51,6 +52,14 @@ func TestUpdate_NotFound(t *testing.T) {
 	}})
 	rr := serveUpdate(handler, `{"alias":"missing","url":"https://example.org"}`)
 	require.Equal(t, http.StatusNotFound, rr.Code)
+}
+
+func TestUpdate_InternalError(t *testing.T) {
+	handler := update.New(slogdiscard.NewDiscardLogger(), updaterStub{update: func(string, string) (int64, error) {
+		return 0, errors.New("storage unavailable")
+	}})
+	rr := serveUpdate(handler, `{"alias":"example","url":"https://example.org"}`)
+	require.Equal(t, http.StatusInternalServerError, rr.Code)
 }
 
 func serveUpdate(handler http.Handler, body string) *httptest.ResponseRecorder {

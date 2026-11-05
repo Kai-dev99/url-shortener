@@ -8,7 +8,7 @@ URL Shortener
 
 # 1. Клонирование репозитория
 
-git clone <repository-url>
+git clone https://github.com/Kai-dev99/url-shortener.git
 cd url-shortener
 
 # 2. Настройка окружения

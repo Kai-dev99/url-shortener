@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/stretchr/testify/require"
 
 	"url-shortener/internal/http-server/handlers/url/save"
@@ -38,6 +39,17 @@ func TestSave_BadRequest(t *testing.T) {
 	var response save.Response
 	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &response))
 	require.Equal(t, "failed to decode request", response.Error)
+}
+
+func TestSave_InvalidURL(t *testing.T) {
+	saver := mocks.NewURLSaver(t)
+	validationErr := validator.New().Struct(struct {
+		URL string `validate:"required,url"`
+	}{URL: "not-a-url"})
+	saver.On("Save", "not-a-url", "example").Return("", validationErr).Once()
+
+	rr := serve(t, save.New(slogdiscard.NewDiscardLogger(), saver), `{"url":"not-a-url","alias":"example"}`)
+	require.Equal(t, http.StatusBadRequest, rr.Code)
 }
 
 func TestSave_Conflict(t *testing.T) {

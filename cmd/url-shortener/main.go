@@ -56,24 +56,7 @@ func main() {
 
 	urlService := service.New(storage)
 
-	router := chi.NewRouter()
-
-	router.Use(middleware.RequestID)
-	router.Use(mwLogger.New(log))
-	router.Use(middleware.Recoverer)
-	router.Use(middleware.URLFormat)
-
-	router.Route("/url", func(r chi.Router) {
-		r.Use(middleware.BasicAuth("url-shortener", map[string]string{
-			cfg.HTTPServer.User: cfg.HTTPServer.Password,
-		}))
-
-		r.Post("/", save.New(log, urlService))
-		r.Put("/", update.New(log, urlService))
-		r.Delete("/{alias}", delete.New(log, urlService))
-	})
-
-	router.Get("/{alias}", redirect.New(log, urlService))
+	router := newRouter(log, urlService, cfg.HTTPServer.User, cfg.HTTPServer.Password)
 
 	log.Info("starting server", slog.String("address", cfg.Address))
 
@@ -114,6 +97,32 @@ func main() {
 	}
 
 	log.Info("server stopped")
+}
+
+type urlService interface {
+	Save(urlToSave string, alias string) (string, error)
+	Get(alias string) (string, error)
+	Update(alias string, newURL string) (int64, error)
+	Delete(alias string) (int64, error)
+}
+
+func newRouter(log *slog.Logger, urlService urlService, username, password string) *chi.Mux {
+	router := chi.NewRouter()
+
+	router.Use(middleware.RequestID)
+	router.Use(mwLogger.New(log))
+	router.Use(middleware.Recoverer)
+	router.Use(middleware.URLFormat)
+
+	router.Route("/url", func(r chi.Router) {
+		r.Use(middleware.BasicAuth("url-shortener", map[string]string{username: password}))
+		r.Post("/", save.New(log, urlService))
+		r.Put("/", update.New(log, urlService))
+		r.Delete("/{alias}", delete.New(log, urlService))
+	})
+	router.Get("/{alias}", redirect.New(log, urlService))
+
+	return router
 }
 
 func setupLogger(env string) *slog.Logger {

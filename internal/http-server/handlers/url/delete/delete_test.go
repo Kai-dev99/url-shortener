@@ -1,6 +1,8 @@
 package delete_test
 
 import (
+	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -34,12 +36,25 @@ func TestDelete_NotFound(t *testing.T) {
 	require.Equal(t, http.StatusNotFound, rr.Code)
 }
 
+func TestDelete_InternalError(t *testing.T) {
+	handler := delete.New(slogdiscard.NewDiscardLogger(), deleterStub{delete: func(string) (int64, error) {
+		return 0, errors.New("storage unavailable")
+	}})
+	rr := serveDelete(handler, "example")
+	require.Equal(t, http.StatusInternalServerError, rr.Code)
+}
+
 func TestDelete_BadRequest(t *testing.T) {
 	handler := delete.New(slogdiscard.NewDiscardLogger(), deleterStub{delete: func(string) (int64, error) {
 		t.Fatal("service must not be called without an alias")
 		return 0, nil
 	}})
-	rr := serveDelete(handler, "")
+	req := httptest.NewRequest(http.MethodDelete, "/", nil)
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("alias", "")
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
 	require.Equal(t, http.StatusBadRequest, rr.Code)
 }
 
